@@ -1,0 +1,795 @@
+Index: src/main/java/schema/users.sql
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/schema/users.sql	(date 1564739668197)
++++ src/main/java/schema/users.sql	(date 1564739668197)
+@@ -0,0 +1,11 @@
++DROP TABLE IF EXISTS users;
++
++CREATE TABLE users (
++  `id` INT AUTO_INCREMENT  PRIMARY KEY NOT NULL,
++  `first_name` VARCHAR(250) NOT NULL,
++  `last_name` VARCHAR(250) NOT NULL,
++  `user_name` VARCHAR(250) DEFAULT NULL,
++  `password` varchar(255) NOT NULL
++) ENGINE=InnoDB DEFAULT CHARSET=utf8;
++
++insert into users (id, first_name, last_name, user_name, password) values (1, 'testFirstName', 'testLastName', 'user', '$2a$10$AlvB7yhm.5h7DvwcSJLBceUcp.5MdJ9FChD5O9XW1GRsKf/aft8gq');
+Index: src/main/java/com/example/demo/service/impl/UserServiceImpl.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/service/impl/UserServiceImpl.java	(date 1564739584637)
++++ src/main/java/com/example/demo/service/impl/UserServiceImpl.java	(date 1564739584637)
+@@ -0,0 +1,53 @@
++package com.example.demo.service.impl;
++
++import com.example.demo.dto.UserDTO;
++import com.example.demo.exception.UserAlreadyExistsException;
++import com.example.demo.persistance.entity.User;
++import com.example.demo.persistance.repository.UserRepository;
++import com.example.demo.service.UserService;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
++import org.springframework.stereotype.Service;
++
++import static java.util.Objects.nonNull;
++
++@Service
++public class UserServiceImpl implements UserService {
++
++    @Autowired
++    private BCryptPasswordEncoder encoder;
++
++    @Autowired
++    private UserRepository userRepository;
++
++    @Override
++    public UserDTO createNewUserInstance(UserDTO userDTO) throws UserAlreadyExistsException {
++        UserDTO createdUser = new UserDTO();
++        User existingUser = userRepository.findUserByUserName(userDTO.getUserName());
++
++        if (nonNull(existingUser)) {
++            throw new UserAlreadyExistsException();
++        } else {
++            User user = saveValidUserInstanceToDB(userDTO);
++            convertUserModelToDTO(createdUser, user);
++        }
++        return createdUser;
++    }
++
++    private void convertUserModelToDTO(UserDTO createdUser, User user) {
++        createdUser.setFirstName(user.getFirstName());
++        createdUser.setId(user.getId());
++        createdUser.setLastName(user.getLastName());
++        createdUser.setUserName(user.getUserName());
++    }
++
++    private User saveValidUserInstanceToDB(UserDTO userDTO) {
++        User user = new User();
++        user.setFirstName(userDTO.getFirstName());
++        user.setLastName(userDTO.getLastName());
++        user.setPassword(encoder.encode(userDTO.getPassword()));
++        user.setUserName(userDTO.getUserName());
++        userRepository.save(user);
++        return user;
++    }
++}
+Index: src/main/java/com/example/demo/DemoApplication.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/DemoApplication.java	(date 1564739095945)
++++ src/main/java/com/example/demo/DemoApplication.java	(date 1564739095945)
+@@ -0,0 +1,13 @@
++package com.example.demo;
++
++import org.springframework.boot.SpringApplication;
++import org.springframework.boot.autoconfigure.SpringBootApplication;
++
++@SpringBootApplication
++public class DemoApplication {
++
++    public static void main(String[] args) {
++        SpringApplication.run(DemoApplication.class, args);
++    }
++
++}
+Index: src/test/java/com/example/demo/DemoApplicationTests.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/test/java/com/example/demo/DemoApplicationTests.java	(date 1564739095929)
++++ src/test/java/com/example/demo/DemoApplicationTests.java	(date 1564739095929)
+@@ -0,0 +1,16 @@
++package com.example.demo;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.junit4.SpringRunner;
++
++@RunWith(SpringRunner.class)
++@SpringBootTest
++public class DemoApplicationTests {
++
++    @Test
++    public void contextLoads() {
++    }
++
++}
+Index: src/test/java/com/example/demo/controller/RegistrationControllerTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/test/java/com/example/demo/controller/RegistrationControllerTest.java	(date 1564740636545)
++++ src/test/java/com/example/demo/controller/RegistrationControllerTest.java	(date 1564740636545)
+@@ -0,0 +1,85 @@
++package com.example.demo.controller;
++
++import org.junit.Assert;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.MediaType;
++import org.springframework.test.context.TestPropertySource;
++import org.springframework.test.context.jdbc.Sql;
++import org.springframework.test.context.junit4.SpringRunner;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
++import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
++
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++@RunWith(SpringRunner.class)
++@SpringBootTest
++@AutoConfigureMockMvc
++@TestPropertySource(locations = { "classpath:application-test.properties" })
++@Sql(scripts = "/sql/data.sql")
++public class RegistrationControllerTest {
++
++    private static final String USERSERVICE = "/userservice";
++    private static final String LOGIN = "/login";
++    private static final String REGISTER = "/register";
++
++    @Autowired
++    private MockMvc mvc;
++
++    @Test
++    public void testSuccessLoginUserWithGoodCredentials() throws Exception {
++        mvc.perform(MockMvcRequestBuilders.post(USERSERVICE + LOGIN + "?userName=userNameTest&password=passw0rd").contentType(MediaType.APPLICATION_FORM_URLENCODED)
++                .accept(MediaType.ALL)).andDo(MockMvcResultHandlers.print()).andExpect(status().isOk());
++    }
++
++    @Test
++    public void testFailedLoginUserWithWrongPassword() throws Exception {
++        mvc.perform(MockMvcRequestBuilders.post(USERSERVICE + LOGIN + "?userName=userNameTest&password=bla").contentType(MediaType.APPLICATION_FORM_URLENCODED)
++                .accept(MediaType.ALL)).andDo(MockMvcResultHandlers.print()).andExpect(status().is(HttpStatus.FORBIDDEN.value()));
++    }
++
++    @Test
++    public void testFailedLoginUserWithWrongUserName() throws Exception {
++        mvc.perform(MockMvcRequestBuilders.post(USERSERVICE + LOGIN + "?userName=userName&password=passw0rd").contentType(MediaType.APPLICATION_FORM_URLENCODED)
++                .accept(MediaType.ALL)).andDo(MockMvcResultHandlers.print()).andExpect(status().is(HttpStatus.FORBIDDEN.value()));
++    }
++
++    @Test
++    public void testSuccessRegistrationNewUserInstance() throws Exception {
++        String expectedResult = "{\"firstName\":\"test\",\"lastName\":\"test\",\"id\":\"6\",\"userName\":\"test\"}";
++        String actualResult = mvc.perform(MockMvcRequestBuilders.post(USERSERVICE + REGISTER).header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
++                .content("{\n" +
++                        "\t\"firstName\":\"test\",\n" +
++                        "\t\"lastName\":\"test\",\n" +
++                        "\t\"userName\":\"test\",\n" +
++                        "\t\"password\":\"test\"\n" +
++                        "}")
++                .accept(MediaType.ALL))
++                .andDo(MockMvcResultHandlers.print()).andExpect(status().isOk())
++                .andReturn().getResponse().getContentAsString();
++
++        Assert.assertEquals(expectedResult, actualResult);
++    }
++
++    @Test
++    public void testRegistrationNewUserInstanceThatAlreadyExists() throws Exception {
++        String expectedResult = "{\"code\":\"USER_ALREADY_EXISTS\",\"description\":\"A user with the given username already exists\"}";
++        String actualResult = mvc.perform(MockMvcRequestBuilders.post(USERSERVICE + REGISTER).header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
++                .content("{\n" +
++                        "\t\"firstName\":\"firstNameTest\",\n" +
++                        "\t\"lastName\":\"lastNameTest\",\n" +
++                        "\t\"userName\":\"userNameTest\",\n" +
++                        "\t\"password\":\"test\"\n" +
++                        "}")
++                .accept(MediaType.ALL))
++                .andDo(MockMvcResultHandlers.print()).andExpect(status().is(HttpStatus.CONFLICT.value()))
++                .andReturn().getResponse().getContentAsString();
++
++        Assert.assertEquals(expectedResult, actualResult);
++    }
++}
+Index: src/test/resources/sql/data.sql
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/test/resources/sql/data.sql	(date 1564740056318)
++++ src/test/resources/sql/data.sql	(date 1564740056318)
+@@ -0,0 +1,3 @@
++delete from users;
++
++insert into users (id, first_name, last_name, user_name, password) values (5, 'firstNameTest', 'lastNameTest', 'userNameTest', '$2a$10$FcViY0FFofWXmel/1g6DHulbyZhWkEy/e5MYiuBfvHHcRwgvp/S8S');
+\ No newline at end of file
+Index: src/test/resources/application-test.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/test/resources/application-test.properties	(date 1564740068590)
++++ src/test/resources/application-test.properties	(date 1564740068590)
+@@ -0,0 +1,12 @@
++spring.datasource.driver-class-name=org.h2.Driver
++spring.datasource.url=jdbc:h2:mem:loto-online
++spring.datasource.username=sa
++spring.datasource.password=
++spring.jackson.serialization.FAIL_ON_EMPTY_BEANS=false
++spring.jpa.properties.hibernate.use_sql_comments=true
++spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
++spring.jpa.hibernate.show_sql=true
++spring.jpa.hibernate.format_sql=true
++spring.jpa.hibernate.ddl-auto=create
++logging.level.org.hibernate.SQL=DEBUG
++logging.level.com.mobimove=DEBUG
+\ No newline at end of file
+Index: src/main/java/com/example/demo/config/WebMvcConfig.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/config/WebMvcConfig.java	(date 1564739237833)
++++ src/main/java/com/example/demo/config/WebMvcConfig.java	(date 1564739237833)
+@@ -0,0 +1,26 @@
++package com.example.demo.config;
++
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
++import org.springframework.web.servlet.config.annotation.CorsRegistry;
++import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
++
++@Configuration
++public class WebMvcConfig implements WebMvcConfigurer {
++
++    private final long MAX_AGE_SECS = 3600;
++
++    @Override
++    public void addCorsMappings(CorsRegistry registry) {
++        registry.addMapping("/**")
++                .allowedOrigins("*")
++                .allowedMethods("HEAD", "OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE")
++                .maxAge(MAX_AGE_SECS);
++    }
++
++    @Bean
++    public BCryptPasswordEncoder passwordEncoder() {
++        return new BCryptPasswordEncoder();
++    }
++}
+Index: src/main/java/com/example/demo/config/SecurityAdapter.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/config/SecurityAdapter.java	(date 1564739237841)
++++ src/main/java/com/example/demo/config/SecurityAdapter.java	(date 1564739237841)
+@@ -0,0 +1,63 @@
++package com.example.demo.config;
++
++import com.example.demo.security.UserDetailsService;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.context.annotation.Bean;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.security.authentication.AuthenticationManager;
++import org.springframework.security.config.BeanIds;
++import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
++import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
++import org.springframework.security.config.annotation.web.builders.HttpSecurity;
++import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
++import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
++import org.springframework.security.config.http.SessionCreationPolicy;
++import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
++
++@Configuration
++@EnableWebSecurity
++@EnableGlobalMethodSecurity(
++        securedEnabled = true,
++        jsr250Enabled = true,
++        prePostEnabled = true
++)
++public class SecurityAdapter extends WebSecurityConfigurerAdapter {
++
++    @Autowired
++    private UserDetailsService userDetailsService;
++
++    @Autowired
++    private BCryptPasswordEncoder encoder;
++
++    @Bean(BeanIds.AUTHENTICATION_MANAGER)
++    @Override
++    public AuthenticationManager authenticationManagerBean() throws Exception {
++        return super.authenticationManagerBean();
++    }
++
++    @Override
++    public void configure(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
++        authenticationManagerBuilder.userDetailsService(userDetailsService).passwordEncoder(encoder);
++    }
++
++    @Override
++    protected void configure(HttpSecurity http) throws Exception {
++        http.
++                cors()
++                .and()
++                .csrf()
++                .disable()
++                .headers().frameOptions().disable()
++                .and()
++                .sessionManagement()
++                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
++                .and()
++                .authorizeRequests()
++                .antMatchers("/h2-console/**")
++                .permitAll()
++                .antMatchers("/userservice/**")
++                .permitAll()
++                .anyRequest()
++                .authenticated();
++    }
++}
+Index: src/main/java/com/example/demo/dto/UserDTO.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/dto/UserDTO.java	(date 1564739301484)
++++ src/main/java/com/example/demo/dto/UserDTO.java	(date 1564739301484)
+@@ -0,0 +1,20 @@
++package com.example.demo.dto;
++
++import lombok.AllArgsConstructor;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++
++@Getter
++@Setter
++@AllArgsConstructor
++@NoArgsConstructor
++public class UserDTO {
++    private long id;
++    private String firstName;
++    private String lastName;
++    private String userName;
++    private String email;
++    private String password;
++    private String role;
++}
+Index: src/main/java/com/example/demo/controller/RegistrationController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/controller/RegistrationController.java	(date 1564740636529)
++++ src/main/java/com/example/demo/controller/RegistrationController.java	(date 1564740636529)
+@@ -0,0 +1,77 @@
++package com.example.demo.controller;
++
++import com.example.demo.dto.UserDTO;
++import com.example.demo.exception.UserAlreadyExistsException;
++import com.example.demo.security.UserPrincipal;
++import com.example.demo.service.UserService;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.http.HttpStatus;
++import org.springframework.http.MediaType;
++import org.springframework.http.ResponseEntity;
++import org.springframework.security.authentication.AuthenticationManager;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.core.Authentication;
++import org.springframework.security.core.context.SecurityContextHolder;
++import org.springframework.web.bind.annotation.*;
++
++import java.util.HashMap;
++import java.util.Map;
++
++@RestController
++@RequestMapping("userservice")
++public class RegistrationController {
++
++    private static final String ID = "id";
++    private static final String FIRST_NAME = "firstName";
++    private static final String LAST_NAME = "lastName";
++    private static final String USER_NAME = "userName";
++    private static final String CODE = "code";
++    private static final String DESCRIPTION = "description";
++    private static final String REGISTER = "/register";
++    private static final String LOGIN = "/login";
++    private static final String PASSWORD = "password";
++    private static final String USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS";
++    private static final String A_USER_WITH_THE_GIVEN_USERNAME_ALREADY_EXISTS = "A user with the given username already exists";
++
++    @Autowired
++    private UserService userService;
++
++    @PostMapping(value = REGISTER)
++    public ResponseEntity<Map<String,String>> registerNewUserInstance(@RequestBody UserDTO userDTO) {
++        try {
++            UserDTO newUserInstance = userService.createNewUserInstance(userDTO);
++            Map<String, String> response = new HashMap<String, String>();
++            response.put(ID, String.valueOf(newUserInstance.getId()));
++            response.put(FIRST_NAME, newUserInstance.getFirstName());
++            response.put(LAST_NAME, newUserInstance.getLastName());
++            response.put(USER_NAME, newUserInstance.getUserName());
++            return ResponseEntity.ok(response);
++        } catch (UserAlreadyExistsException e) {
++            Map<String, String> response = new HashMap<String, String>();
++            response.put(CODE, USER_ALREADY_EXISTS);
++            response.put(DESCRIPTION, A_USER_WITH_THE_GIVEN_USERNAME_ALREADY_EXISTS);
++            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
++        }
++    }
++
++    @Autowired
++    private AuthenticationManager authenticationManager;
++
++    @PostMapping(value = LOGIN, consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
++    public ResponseEntity<Map<String, String>> login(@RequestParam(value = USER_NAME) String userName, @RequestParam(value = PASSWORD) String password) {
++        Authentication authentication = authenticationManager
++                .authenticate(new UsernamePasswordAuthenticationToken(userName, password));
++
++        SecurityContextHolder.getContext().setAuthentication(authentication);
++
++        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
++
++        Map<String, String> response = new HashMap<String, String>();
++        response.put(ID, String.valueOf(principal.getId()));
++        response.put(USER_NAME, principal.getUsername());
++        response.put(FIRST_NAME, principal.getFirstName());
++        response.put(LAST_NAME, principal.getLastName());
++
++        return ResponseEntity.ok(response);
++    }
++}
+\ No newline at end of file
+Index: pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- pom.xml	(date 1564739841844)
++++ pom.xml	(date 1564739841844)
+@@ -0,0 +1,66 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
++         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
++    <modelVersion>4.0.0</modelVersion>
++    <parent>
++        <groupId>org.springframework.boot</groupId>
++        <artifactId>spring-boot-starter-parent</artifactId>
++        <version>2.1.6.RELEASE</version>
++        <relativePath/> <!-- lookup parent from repository -->
++    </parent>
++    <groupId>com.example</groupId>
++    <artifactId>demo</artifactId>
++    <version>0.0.1-SNAPSHOT</version>
++    <name>demo</name>
++    <description>Demo project for Spring Boot</description>
++
++    <properties>
++        <java.version>1.8</java.version>
++    </properties>
++
++    <dependencies>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-data-jpa</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-security</artifactId>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-web</artifactId>
++        </dependency>
++
++        <dependency>
++            <groupId>com.h2database</groupId>
++            <artifactId>h2</artifactId>
++            <scope>runtime</scope>
++        </dependency>
++        <dependency>
++            <groupId>org.projectlombok</groupId>
++            <artifactId>lombok</artifactId>
++            <optional>true</optional>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-test</artifactId>
++            <scope>test</scope>
++        </dependency>
++        <dependency>
++            <groupId>org.springframework.security</groupId>
++            <artifactId>spring-security-test</artifactId>
++            <scope>test</scope>
++        </dependency>
++    </dependencies>
++
++    <build>
++        <plugins>
++            <plugin>
++                <groupId>org.springframework.boot</groupId>
++                <artifactId>spring-boot-maven-plugin</artifactId>
++            </plugin>
++        </plugins>
++    </build>
++
++</project>
+Index: src/main/java/com/example/demo/exception/UserAlreadyExistsException.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/exception/UserAlreadyExistsException.java	(date 1564739347899)
++++ src/main/java/com/example/demo/exception/UserAlreadyExistsException.java	(date 1564739347899)
+@@ -0,0 +1,8 @@
++package com.example.demo.exception;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.web.bind.annotation.ResponseStatus;
++
++@ResponseStatus(value = HttpStatus.CONFLICT, reason = "User already exist")
++public class UserAlreadyExistsException extends Exception {
++}
+Index: .gitignore
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .gitignore	(date 1564739091776)
++++ .gitignore	(date 1564739091776)
+@@ -0,0 +1,31 @@
++HELP.md
++target/
++!.mvn/wrapper/maven-wrapper.jar
++!**/src/main/**
++!**/src/test/**
++
++### STS ###
++.apt_generated
++.classpath
++.factorypath
++.project
++.settings
++.springBeans
++.sts4-cache
++
++### IntelliJ IDEA ###
++.idea
++*.iws
++*.iml
++*.ipr
++
++### NetBeans ###
++/nbproject/private/
++/nbbuild/
++/dist/
++/nbdist/
++/.nb-gradle/
++build/
++
++### VS Code ###
++.vscode/
+Index: src/main/java/com/example/demo/security/UserDetailsService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/security/UserDetailsService.java	(date 1564739489579)
++++ src/main/java/com/example/demo/security/UserDetailsService.java	(date 1564739489579)
+@@ -0,0 +1,27 @@
++package com.example.demo.security;
++
++import com.example.demo.persistance.entity.User;
++import com.example.demo.persistance.repository.UserRepository;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.security.core.userdetails.UserDetails;
++import org.springframework.security.core.userdetails.UsernameNotFoundException;
++import org.springframework.stereotype.Service;
++
++import static java.util.Objects.isNull;
++
++@Service
++public class UserDetailsService implements org.springframework.security.core.userdetails.UserDetailsService {
++
++    @Autowired
++    private UserRepository userRepository;
++
++    @Override
++    public UserDetails loadUserByUsername(String userName) throws UsernameNotFoundException {
++        User user = userRepository.findUserByUserName(userName);
++        if (isNull(user)) {
++            throw new UsernameNotFoundException("User not found with username : " + userName);
++        }
++
++        return UserPrincipal.create(user);
++    }
++}
+Index: src/main/java/com/example/demo/persistance/entity/User.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/persistance/entity/User.java	(date 1564739430938)
++++ src/main/java/com/example/demo/persistance/entity/User.java	(date 1564739430938)
+@@ -0,0 +1,28 @@
++package com.example.demo.persistance.entity;
++
++import lombok.AllArgsConstructor;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++
++import javax.persistence.*;
++
++@Entity
++@Table(name = "users")
++@Getter
++@Setter
++@AllArgsConstructor
++@NoArgsConstructor
++public class User {
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY )
++    private long id;
++    @Column(name = "first_name")
++    private String firstName;
++    @Column(name = "last_name")
++    private String lastName;
++    @Column(name = "user_name")
++    private String userName;
++    @Column(name = "password")
++    private String password;
++}
+Index: src/main/java/com/example/demo/persistance/repository/UserRepository.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/persistance/repository/UserRepository.java	(date 1564739430946)
++++ src/main/java/com/example/demo/persistance/repository/UserRepository.java	(date 1564739430946)
+@@ -0,0 +1,9 @@
++package com.example.demo.persistance.repository;
++
++import com.example.demo.persistance.entity.User;
++import org.springframework.data.jpa.repository.JpaRepository;
++
++public interface UserRepository extends JpaRepository<User, Long> {
++
++    User findUserByUserName(String userName);
++}
+Index: src/main/java/com/example/demo/service/UserService.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/service/UserService.java	(date 1564739519054)
++++ src/main/java/com/example/demo/service/UserService.java	(date 1564739519054)
+@@ -0,0 +1,9 @@
++package com.example.demo.service;
++
++import com.example.demo.dto.UserDTO;
++import com.example.demo.exception.UserAlreadyExistsException;
++
++public interface UserService {
++
++    UserDTO createNewUserInstance(UserDTO userDTO) throws UserAlreadyExistsException;
++}
+Index: src/main/resources/application.properties
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/resources/application.properties	(date 1564739584649)
++++ src/main/resources/application.properties	(date 1564739584649)
+@@ -0,0 +1,10 @@
++spring.jpa.properties.hibernate.hbm2ddl.auto=update
++
++spring.datasource.url=jdbc:h2:mem:testdb
++spring.datasource.driverClassName=org.h2.Driver
++spring.datasource.username=sa
++spring.datasource.password=password
++spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
++
++spring.h2.console.enabled=true
++
+Index: src/main/java/com/example/demo/security/UserPrincipal.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/example/demo/security/UserPrincipal.java	(date 1564739489591)
++++ src/main/java/com/example/demo/security/UserPrincipal.java	(date 1564739489591)
+@@ -0,0 +1,65 @@
++package com.example.demo.security;
++
++import com.example.demo.persistance.entity.User;
++import com.fasterxml.jackson.annotation.JsonIgnore;
++import lombok.AllArgsConstructor;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++import org.springframework.security.core.GrantedAuthority;
++import org.springframework.security.core.userdetails.UserDetails;
++
++import java.util.Collection;
++
++@Getter
++@Setter
++@AllArgsConstructor
++@NoArgsConstructor
++public class UserPrincipal implements UserDetails {
++
++    private Long id;
++    private String firstName;
++    private String lastName;
++    private String username;
++    @JsonIgnore
++    private String password;
++
++    public static UserPrincipal create(User user) {
++        return new UserPrincipal(user.getId(), user.getFirstName(), user.getLastName(), user.getUserName(), user.getPassword());
++    }
++
++    @Override
++    public Collection<? extends GrantedAuthority> getAuthorities() {
++        return null;
++    }
++
++    @Override
++    public String getPassword() {
++        return password;
++    }
++
++    @Override
++    public String getUsername() {
++        return username;
++    }
++
++    @Override
++    public boolean isAccountNonExpired() {
++        return true;
++    }
++
++    @Override
++    public boolean isAccountNonLocked() {
++        return true;
++    }
++
++    @Override
++    public boolean isCredentialsNonExpired() {
++        return true;
++    }
++
++    @Override
++    public boolean isEnabled() {
++        return true;
++    }
++}
